@@ -10,15 +10,21 @@ another. The reading pane shows each element as one **assembled** page — apply
 variability at render time, the way the published site does — while the
 underlying `data/method.json` stays faithful to the source, keeping every base
 element and every variability fragment as a separate node joined by variability
-edges. Browse by **element type**, by **plugin/practice**, or by **configuration**
-(e.g. OpenUP), with a force-directed graph view and shareable `#guid` links.
+edges. Browse by **element type**, scope the library with a **plugin picker**
+(check individual practices on/off, with preset buttons for OpenUP / All EPF /
+ABRD and automatic dependency resolution), with a force-directed graph view and
+shareable `#guid` links. The plugin selection is also captured in the URL
+(`?plugins=…`) so a scoped view can be shared.
 
 > **Note on OpenUP:** OpenUP is not a separate download — it is one of the
 > *configurations* inside this library (a selection of the `core.*` +
 > `practice.*` plugins). Ingesting all 54 plugins therefore includes all of
-> OpenUP plus the extra EPF practices layered around it. Use the **Configuration**
-> facet to view just OpenUP (47 plugins / 686 elements), All EPF Practices, or
-> Agile Business Rules Development.
+> OpenUP plus the extra EPF practices layered around it. Use the **Plugins**
+> picker (or its **OpenUP** preset) to view just OpenUP (47 plugins /
+> 686 elements), All EPF Practices, or Agile Business Rules Development — or
+> tick an arbitrary subset of practices. Practices that another selected
+> practice depends on are pulled in automatically (e.g. selecting *Release
+> Planning* also enables *Iterative Development*).
 
 ## Enable GitHub Pages
 
