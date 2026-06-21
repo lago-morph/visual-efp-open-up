@@ -477,9 +477,10 @@ function linksPanelHTML(n,A){
   const inRefs=inAll.filter(e=>!e.variability);
   // group helper
   const grp=(arr,keyTo)=>{const g={};arr.forEach(e=>{(g[e.type]=g[e.type]||[]).push(keyTo?e.from_guid:e.to_guid);});return g;};
-  const renderRefs=g=>{
+  const renderRefs=(g,inbound=false)=>{
     const ks=Object.keys(g).sort(); if(!ks.length) return '<div class="empty">none</div>';
-    return ks.map(t=>`<div class="reltype">${esc(prettyRel(t))}</div>`+
+    const labelFn=inbound?prettyRelInbound:prettyRel;
+    return ks.map(t=>`<div class="reltype">${esc(labelFn(t))}</div>`+
       g[t].map(gid=>byGuid[gid]
         ? `<div class="rel" data-g="${esc(gid)}"><span class="ty">${esc(shortType(byGuid[gid].type))}</span>${esc(nameOf(gid))}</div>`
         : `<div class="rel" style="cursor:default"><span class="ty">?</span><span style="color:var(--dead)">unresolved (${esc(gid).slice(0,10)}…)</span></div>`
@@ -496,7 +497,7 @@ function linksPanelHTML(n,A){
 
   return `<div class="lp"><div class="lph">⚡ Variability</div><div class="lpb">${vhtml}</div></div>`+
          `<div class="lp"><div class="lph">→ Outbound references${A.contributors.length?' (assembled)':''}</div><div class="lpb">${renderRefs(outG)}</div></div>`+
-         `<div class="lp"><div class="lph">← Inbound references</div><div class="lpb">${renderRefs(grp(inRefs,true))}</div></div>`;
+         `<div class="lp"><div class="lph">← Inbound references</div><div class="lpb">${renderRefs(grp(inRefs,true),true)}</div></div>`;
 }
 function vrel(arrow,type,dir,gid){
   const known=byGuid[gid];
@@ -507,6 +508,33 @@ function vrel(arrow,type,dir,gid){
 }
 function invRel(t){return {contributes:"contributed to by",extends:"extended by",replaces:"replaced by"}[t]||(t+" by");}
 function prettyRel(t){return t.replace(/_/g," ").replace(/([a-z])([A-Z])/g,"$1 $2").toLowerCase();}
+// Label for an edge type when viewed from the TARGET end (inbound reference)
+function prettyRelInbound(t){
+  const m={
+    mandatoryInput:"mandatory input of",
+    optionalInput:"optional input of",
+    output:"produced by",
+    performedBy:"primary performer of",
+    additionallyPerformedBy:"additional performer of",
+    responsibleFor:"responsibility of",
+    fulfills:"fulfilled by",
+    guidelines:"guideline for",
+    checklists:"checklist for",
+    examples:"example for",
+    templates:"template for",
+    toolMentors:"tool mentor for",
+    reports:"report for",
+    supportingMaterials:"supporting material for",
+    categorizedElements:"categorized in",
+    conceptsAndPapers:"concept/paper for",
+    tasks:"task in",
+    workProducts:"work product in",
+    roles:"role in",
+    contentReferences:"referenced by",
+    activityReferences:"activity reference for",
+  };
+  return m[t]||("← "+prettyRel(t));
+}
 function shortType(t){return (tmeta(t).l||t).split(" ")[0];}
 
 function overviewHTML(){
