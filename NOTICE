@@ -1,0 +1,49 @@
+NOTICE
+======
+
+This product imports and redistributes content from the Eclipse Process
+Framework (EPF) Practices method library.
+
+Imported content
+----------------
+The method content under `source/` (and the text embedded in
+`data/method.json`) is part of the EPF Practices library, version 1.5.1.5,
+dated 2012-12-12. It is redistributed here verbatim from the Internet Archive:
+
+    Item:  epf-2021-11-26
+    File:  Libraries/epf_practices_library_1.5.1.5_20121212.zip
+
+License of the imported content
+-------------------------------
+The imported EPF content is made available under the Eclipse Public License
+v1.0 (EPL-1.0). A copy is provided in `LICENSES/EPL-1.0.txt` and is also
+available at http://www.eclipse.org/legal/epl-v10.html.
+
+The distributor's original "About This Content" statement is preserved
+verbatim at `source/epf_prac_1515/about.htm`. It states that, unless otherwise
+indicated, the content is provided under the EPL-1.0.
+
+Preserved copyright notices
+---------------------------
+The following copyright notices are preserved verbatim from the library's own
+copyright statement (plug-in `core.default.release_copyright.base`, element
+"EPF Copyright"):
+
+    © Copyright IBM Corp. 1987, 2012. All Rights Reserved.
+    © Copyright Telelogic AB. 2006, 2007. All Rights Reserved.
+    © Copyright Armstrong Process Group, Inc. 2006. All Rights Reserved.
+    © Copyright Number Six Software, Inc. 2006, 2007. All Rights Reserved.
+    © Copyright Xansa plc. 2006, 2007. All Rights Reserved.
+    © Copyright Scaled Agile, Inc. 2011. All Rights Reserved.
+    And others. All Rights Reserved.
+
+Every content node in `data/method.json` is tagged `"license": "EPL-1.0"` and
+links back to this license so the licensing of each element is explicit in the
+viewer.
+
+Viewer code
+-----------
+The viewer and tooling code in this repository (see `LICENSE` section 1) is the
+separate work of Lagomorph Labs and is licensed under the MIT License
+(`LICENSES/MIT.txt`). It is not part of the EPF content and is not covered by
+the EPL-1.0.

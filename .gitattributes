@@ -1,0 +1,10 @@
+# The EPF archive under source/ is the canonical, verbatim copy — never edited.
+# Mark its binary resources so git does not attempt to diff/normalize them.
+source/** -text
+*.dot binary
+*.doc binary
+*.ppt binary
+*.xls binary
+*.pdf binary
+*.gif binary
+*.jpg binary

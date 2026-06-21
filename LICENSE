@@ -1,0 +1,38 @@
+This repository is DUAL-LICENSED. Two different licenses apply to two
+different parts of the repository:
+
+============================================================================
+1. Viewer & tooling code  —  MIT License
+============================================================================
+Everything authored for this project is licensed under the MIT License:
+
+  - index.html                  (the single-page viewer)
+  - tools/                      (the build / fetch scripts)
+  - the SCHEMA and code of data/method.json (the JSON structure itself)
+  - README.md, PLAN.md, and other repository scaffolding
+
+  Copyright (c) 2026 Lagomorph Labs.
+  Full text: LICENSES/MIT.txt
+
+============================================================================
+2. Imported EPF Practices content  —  Eclipse Public License v1.0 (EPL-1.0)
+============================================================================
+The Eclipse Process Framework (EPF) Practices method library that this project
+imports and displays is licensed under the Eclipse Public License v1.0. This
+covers:
+
+  - everything under source/   (the verbatim EPF Practices 1.5.1.5 archive)
+  - the method CONTENT embedded in data/method.json — element names,
+    descriptions, section HTML, and every other text/field derived from the
+    archive (each such node is tagged "license": "EPL-1.0").
+
+  Copyright (c) the EPF contributors — see NOTICE for the full, preserved
+  list of copyright holders (IBM, Telelogic, Armstrong Process Group,
+  Number Six Software, Xansa, Scaled Agile, and others).
+  Full text: LICENSES/EPL-1.0.txt
+  Provenance: EPF Practices 1.5.1.5 (2012-12-12), Internet Archive item
+  "epf-2021-11-26".
+
+----------------------------------------------------------------------------
+In short: the viewer is MIT, the EPF method content it renders is EPL-1.0.
+See NOTICE for preserved copyright notices and provenance.
