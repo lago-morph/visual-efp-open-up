@@ -123,15 +123,41 @@
   footer{flex:0 0 auto;border-top:1px solid var(--line);background:var(--panel);padding:8px 16px;
          font-size:12px;color:var(--muted);display:flex;gap:16px;flex-wrap:wrap}
   .spin{padding:40px;text-align:center;color:var(--muted)}
+  /* plugin picker */
+  #pluginPickerWrap{position:relative;display:inline-block}
+  #pluginPicker{display:none;position:absolute;top:calc(100% + 4px);left:0;z-index:300;
+    background:var(--panel);border:1px solid var(--line);border-radius:10px;
+    box-shadow:0 6px 28px rgba(0,0,0,.13);min-width:310px;max-height:72vh;
+    overflow-y:auto;padding-bottom:6px}
+  #pluginPicker.open{display:block}
+  .pp-presets{display:flex;gap:5px;flex-wrap:wrap;padding:8px 12px 8px;border-bottom:1px solid var(--line)}
+  .pp-pre{padding:3px 9px;border:1px solid var(--line);border-radius:5px;background:#fff;
+    cursor:pointer;font-size:12px;white-space:nowrap}
+  .pp-pre:hover,.pp-pre.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+  .pp-family{padding:7px 12px 2px;font-size:11px;text-transform:uppercase;letter-spacing:.6px;
+    color:var(--muted);font-weight:600}
+  .pp-unit{display:flex;align-items:flex-start;gap:8px;padding:3px 12px;cursor:pointer;border-radius:5px}
+  .pp-unit:hover{background:var(--chip)}
+  .pp-unit input[type=checkbox]{margin-top:2px;width:14px;height:14px;cursor:pointer;flex:0 0 auto;accent-color:var(--accent)}
+  .pp-unit input:disabled{cursor:default;opacity:.5}
+  .pp-ulabel{font-size:13px;flex:1}
+  .pp-dep{font-size:11px;color:var(--muted);display:block}
+  .pp-foot{display:flex;align-items:center;gap:8px;padding:7px 12px 2px;border-top:1px solid var(--line);margin-top:4px}
+  .pp-footbtn{padding:3px 9px;border:1px solid var(--line);border-radius:5px;background:#fff;cursor:pointer;font-size:12px}
+  .pp-footbtn:hover{background:var(--chip)}
+  .pp-count{font-size:12px;color:var(--muted);margin-left:auto}
 </style>
 </head>
 <body>
 <header>
   <h1>EPF Practices <small>· Method Browser</small></h1>
   <input id="search" type="search" placeholder="Filter elements by name…" autocomplete="off"/>
-  <label style="font-size:12px;color:var(--muted)">Config
+  <label style="font-size:12px;color:var(--muted)">Preset
     <select id="cfgSel"></select></label>
-  <select id="pluginSel"></select>
+  <div id="pluginPickerWrap">
+    <button id="pluginBtn" class="btn">Plugins ▾</button>
+    <div id="pluginPicker"></div>
+  </div>
   <button id="graphBtn" class="btn">Graph view</button>
 </header>
 <div id="wrap">
@@ -174,9 +200,53 @@ const TYPE_META = {
 };
 const tmeta = t => TYPE_META[t] || {l:t,c:"#888",g:99};
 
+// ---- plugin practice units (selectable; base+assign treated as one) --------
+const PRACTICE_UNITS = [
+  {id:"iterative_dev",  label:"Iterative Development",       family:"Management",
+   plugins:["practice.mgmt.iterative_dev.base","practice.mgmt.iterative_dev.assign"]},
+  {id:"release_planning",label:"Release Planning",           family:"Management",
+   plugins:["practice.mgmt.release_planning.base","practice.mgmt.release_planning.assign"]},
+  {id:"risk_value_lifecycle",label:"Risk / Value Lifecycle", family:"Management",
+   plugins:["practice.mgmt.risk_value_lifecycle.base"]},
+  {id:"whole_team",     label:"Whole Team",                  family:"Management",
+   plugins:["practice.mgmt.whole_team.base","practice.mgmt.whole_team.assign"]},
+  {id:"team_change_mgmt",label:"Team & Change Management",   family:"Management",
+   plugins:["practice.mgmt.team_change_mgmt.base","practice.mgmt.team_change_mgmt.assign"]},
+  {id:"project_process_tailoring",label:"Project Process Tailoring",family:"Management",
+   plugins:["practice.mgmt.project_process_tailoring.base","practice.mgmt.project_process_tailoring.assign"]},
+  {id:"evolutionary_arch",label:"Evolutionary Architecture", family:"Technical",
+   plugins:["practice.tech.evolutionary_arch.base","practice.tech.evolutionary_arch.assign"]},
+  {id:"evolutionary_design",label:"Evolutionary Design",     family:"Technical",
+   plugins:["practice.tech.evolutionary_design.base","practice.tech.evolutionary_design.assign"]},
+  {id:"shared_vision",  label:"Shared Vision",               family:"Technical",
+   plugins:["practice.tech.shared_vision.base","practice.tech.shared_vision.assign"]},
+  {id:"concurrent_testing",label:"Concurrent Testing",       family:"Technical",
+   plugins:["practice.tech.concurrent_testing.base","practice.tech.concurrent_testing.assign"]},
+  {id:"continuous_integration",label:"Continuous Integration",family:"Technical",
+   plugins:["practice.tech.continuous_integration.base","practice.tech.continuous_integration.assign"]},
+  {id:"test_driven_development",label:"Test Driven Development",family:"Technical",
+   plugins:["practice.tech.test_driven_development.base","practice.tech.test_driven_development.assign"]},
+  {id:"use_case_driven_dev",label:"Use Case Driven Dev",     family:"Technical",
+   plugins:["practice.tech.use_case_driven_dev.base","practice.tech.use_case_driven_dev.assign"]},
+  {id:"abrd",           label:"Agile Business Rules Dev",    family:"Technical",
+   plugins:["practice.tech.abrd.base","practice.tech.abrd.assign"]},
+  {id:"doc_trng",       label:"Documentation & Training",    family:"General",
+   plugins:["practice.gen.doc_trng.base","practice.gen.doc_trng.assign"]},
+  {id:"production_release",label:"Production Release",       family:"General",
+   plugins:["practice.gen.production_release.base","practice.gen.production_release.assign"]},
+  {id:"mdev",           label:"Mobile Development",          family:"Business",
+   plugins:["practice.bus.mdev.base"]},
+  {id:"openup_process", label:"OpenUP (capability patterns)",family:"Process",
+   plugins:["process.openup.base","publish.openup.base"]},
+  {id:"abrd_process",   label:"ABRD (capability patterns)",  family:"Process",
+   plugins:["process.abrd.base","publish.abrd.base"]},
+];
+let dirToPU={};  // plugin dir -> practice unit id
+
 // ---- state ---------------------------------------------------------------
 let DATA, byGuid={}, outBy={}, inBy={}, configs={}, plugins={};
-const state = {cfg:"", plugin:"", q:"", graph:false, sel:null, openTypes:new Set()};
+const state = {cfg:"", q:"", graph:false, sel:null, openTypes:new Set(),
+               selectedPUs:new Set(), allSelected:true, pluginSet:null};
 
 // ---- load ----------------------------------------------------------------
 fetch("data/method.json").then(r=>r.json()).then(d=>{
@@ -188,6 +258,8 @@ fetch("data/method.json").then(r=>r.json()).then(d=>{
   });
   d.plugins.forEach(p=>plugins[p.dir]=p);
   d.configs=d.configurations; d.configurations.forEach(c=>configs[c.guid]=c);
+  initPracticeUnits();
+  readPluginState();
   initControls();
   window.addEventListener("hashchange",onHash);
   onHash();
@@ -202,14 +274,8 @@ function esc(s){return (s||"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">"
 function nameOf(g){const n=byGuid[g];return n?(n.presentation_name||n.name||g):null;}
 function curGuid(){return decodeURIComponent((location.hash||"").replace(/^#/,""));}
 
-function configPlugins(){ // set of plugin dirs for active config, or null=all
-  if(!state.cfg) return null;
-  const c = configs[state.cfg]; return c? new Set(c.plugins) : null;
-}
 function visible(n){
-  const cp = configPlugins();
-  if(cp && !cp.has(n.plugin)) return false;
-  if(state.plugin && n.plugin!==state.plugin) return false;
+  if(!state.allSelected && state.pluginSet && !state.pluginSet.has(n.plugin)) return false;
   if(state.q){
     const q=state.q.toLowerCase();
     if(!((n.presentation_name||"").toLowerCase().includes(q) ||
@@ -223,35 +289,259 @@ function initControls(){
   const cs=document.getElementById("cfgSel");
   cs.innerHTML='<option value="">All content</option>'+
     DATA.configurations.map(c=>`<option value="${c.guid}">${esc(c.presentation_name)}</option>`).join("");
-  cs.onchange=()=>{state.cfg=cs.value;renderSidebar();updateCfgInfo();if(state.graph)drawGraph();};
+  cs.onchange=()=>{
+    state.cfg=cs.value;
+    if(!state.cfg){
+      state.allSelected=true; state.selectedPUs=new Set();
+    } else {
+      const cfg=configs[state.cfg];
+      state.allSelected=false;
+      state.selectedPUs=puIdsForConfig(cfg);
+    }
+    computePluginSet(); renderSidebar(); renderPluginPicker(); updatePluginBtn();
+    savePluginState(); if(state.graph)drawGraph();
+  };
 
-  const ps=document.getElementById("pluginSel");
-  const fam={};
-  DATA.plugins.forEach(p=>{const k=p.dir.split(".")[0];(fam[k]=fam[k]||[]).push(p);});
-  let html='<option value="">All plugins ('+DATA.plugins.length+')</option>';
-  Object.keys(fam).sort().forEach(k=>{
-    html+=`<optgroup label="${k}.*">`+
-      fam[k].sort((a,b)=>a.presentation_name.localeCompare(b.presentation_name))
-        .map(p=>`<option value="${esc(p.dir)}">${esc(p.presentation_name)} — ${esc(p.dir)}</option>`).join("")+
-      `</optgroup>`;
+  document.getElementById("pluginBtn").onclick=e=>{
+    e.stopPropagation(); togglePluginPicker();
+  };
+  document.addEventListener("click",e=>{
+    if(!document.getElementById("pluginPickerWrap").contains(e.target)) closePluginPicker();
   });
-  ps.innerHTML=html;
-  ps.onchange=()=>{state.plugin=ps.value;renderSidebar();if(state.graph)drawGraph();};
 
   document.getElementById("search").oninput=e=>{state.q=e.target.value.trim();renderSidebar();};
   document.getElementById("graphBtn").onclick=toggleGraph;
 
-  // footer provenance counts
   const c=DATA.meta.counts;
   document.getElementById("provctr").innerHTML =
     `${c.nodes} elements · ${c.edges} links · ${c.variability_edges} variability · ${c.plugins} plugins`;
+
+  renderPluginPicker();
+  updatePluginBtn();
 }
 function updateCfgInfo(){
   const el=document.getElementById("cfgInfo"); if(!el) return;
-  if(!state.cfg){el.textContent="Showing the whole library."; return;}
-  const c=configs[state.cfg];
-  const n=DATA.nodes.filter(x=>c.plugins.includes(x.plugin)).length;
-  el.innerHTML=`<b>${esc(c.presentation_name)}</b>: ${c.plugins.length} plugins, ${n} elements.`;
+  if(state.allSelected){el.textContent="Showing all "+DATA.nodes.length+" elements."; return;}
+  const vis=DATA.nodes.filter(visible).length;
+  if(state.cfg && configs[state.cfg]){
+    const c=configs[state.cfg];
+    el.innerHTML=`<b>${esc(c.presentation_name)}</b>: ${vis} elements shown.`;
+  } else {
+    el.textContent=`Custom selection: ${vis} elements shown.`;
+  }
+}
+
+// ---- practice unit dependency logic ----------------------------------------
+function initPracticeUnits(){
+  const dirByGuid={};
+  DATA.plugins.forEach(p=>{ if(p.guid) dirByGuid[p.guid]=p.dir; });
+  PRACTICE_UNITS.forEach(pu=>pu.plugins.forEach(d=>dirToPU[d]=pu.id));
+  const puById={}; PRACTICE_UNITS.forEach(pu=>puById[pu.id]=pu);
+  PRACTICE_UNITS.forEach(pu=>{
+    const depIds=new Set();
+    pu.plugins.forEach(dir=>{
+      const plug=plugins[dir]; if(!plug||!plug.bases) return;
+      plug.bases.forEach(bg=>{
+        const bd=dirByGuid[bg]; if(!bd) return;
+        const depId=dirToPU[bd]; if(depId&&depId!==pu.id) depIds.add(depId);
+      });
+    });
+    pu.deps=[...depIds];
+  });
+  // build reverse deps
+  const rdeps={};
+  PRACTICE_UNITS.forEach(pu=>pu.deps.forEach(d=>(rdeps[d]=rdeps[d]||[]).push(pu.id)));
+  PRACTICE_UNITS.forEach(pu=>pu.rdeps=rdeps[pu.id]||[]);
+}
+
+function expandDeps(ids){
+  const result=new Set(ids);
+  let changed=true;
+  while(changed){
+    changed=false;
+    PRACTICE_UNITS.forEach(pu=>{
+      if(result.has(pu.id)) pu.deps.forEach(d=>{ if(!result.has(d)){result.add(d);changed=true;} });
+    });
+  }
+  return result;
+}
+
+function computePluginSet(){
+  if(state.allSelected){state.pluginSet=null;return;}
+  const effective=expandDeps(state.selectedPUs);
+  const dirs=new Set();
+  PRACTICE_UNITS.forEach(pu=>{ if(effective.has(pu.id)) pu.plugins.forEach(d=>dirs.add(d)); });
+  // core.* plugins are shared infrastructure (slots, roles, UMA concepts,
+  // categories) that practices reference — always include so cross-refs resolve.
+  DATA.plugins.forEach(p=>{ if(p.dir.startsWith("core.")) dirs.add(p.dir); });
+  state.pluginSet=dirs;
+}
+
+function puIdsForConfig(cfg){
+  const cfgDirs=new Set(cfg.plugins);
+  const ids=new Set();
+  PRACTICE_UNITS.forEach(pu=>{
+    const existing=pu.plugins.filter(d=>plugins[d]);
+    if(existing.length&&existing.every(d=>cfgDirs.has(d))) ids.add(pu.id);
+  });
+  return ids;
+}
+
+function readPluginState(){
+  const ps=new URLSearchParams(location.search).get("plugins");
+  if(ps){
+    const ids=ps.split(",").filter(id=>PRACTICE_UNITS.find(pu=>pu.id===id));
+    if(ids.length){
+      state.allSelected=false;
+      state.selectedPUs=new Set(ids);
+      computePluginSet();
+    }
+  }
+}
+
+function savePluginState(){
+  const params=new URLSearchParams(location.search);
+  if(state.allSelected||state.selectedPUs.size===0) params.delete("plugins");
+  else params.set("plugins",[...state.selectedPUs].join(","));
+  const qs=params.toString();
+  history.replaceState(null,"",""+(qs?"?"+qs:"")+location.hash);
+}
+
+function updatePluginBtn(){
+  const btn=document.getElementById("pluginBtn");
+  if(state.allSelected){
+    btn.textContent="Plugins: All ▾"; btn.classList.remove("active");
+  } else {
+    const eff=expandDeps(state.selectedPUs).size;
+    btn.textContent=`Plugins: ${eff}/${PRACTICE_UNITS.length} ▾`;
+    btn.classList.toggle("active", eff < PRACTICE_UNITS.length);
+  }
+}
+
+function togglePluginPicker(){
+  const p=document.getElementById("pluginPicker");
+  if(p.classList.contains("open")) p.classList.remove("open");
+  else { renderPluginPicker(); p.classList.add("open"); }
+}
+function closePluginPicker(){ document.getElementById("pluginPicker").classList.remove("open"); }
+
+function renderPluginPicker(){
+  const effective=state.allSelected?new Set(PRACTICE_UNITS.map(p=>p.id)):expandDeps(state.selectedPUs);
+  // Which PUs are auto-required (in effective but not in selectedPUs)?
+  const autoReqBy={}; // puId -> [requiringId,...]
+  if(!state.allSelected){
+    PRACTICE_UNITS.forEach(pu=>{
+      if(effective.has(pu.id)&&!state.selectedPUs.has(pu.id)){
+        pu.deps.forEach(()=>{}); // already in effective through someone
+        // find who requires this
+        const req=pu.rdeps.filter(r=>effective.has(r));
+        autoReqBy[pu.id]=req;
+      }
+    });
+  }
+
+  // preset buttons
+  const presetMap={};
+  DATA.configurations.forEach(c=>{
+    const ids=puIdsForConfig(c); presetMap[c.guid]=ids;
+  });
+  function isPresetActive(cfgGuid){
+    if(state.allSelected) return false;
+    const pids=presetMap[cfgGuid];
+    if(!pids||pids.size!==state.selectedPUs.size) return false;
+    return [...pids].every(id=>state.selectedPUs.has(id));
+  }
+
+  let h=`<div class="pp-presets">`;
+  h+=`<button class="pp-pre${state.allSelected?" active":""}" data-preset="all">All EPF</button>`;
+  DATA.configurations.forEach(c=>{
+    h+=`<button class="pp-pre${isPresetActive(c.guid)?" active":""}" data-preset="${esc(c.guid)}">${esc(c.presentation_name)}</button>`;
+  });
+  h+=`</div>`;
+
+  // grouped checkboxes
+  const families=[...new Set(PRACTICE_UNITS.map(pu=>pu.family))];
+  families.forEach(fam=>{
+    h+=`<div class="pp-family">${esc(fam)}</div>`;
+    PRACTICE_UNITS.filter(pu=>pu.family===fam).forEach(pu=>{
+      const isEff=state.allSelected||effective.has(pu.id);
+      const isAuto=!state.allSelected&&isEff&&!state.selectedPUs.has(pu.id);
+      const reqBy=autoReqBy[pu.id]||[];
+      const depLabel=isAuto&&reqBy.length
+        ? `<span class="pp-dep">required by: ${reqBy.map(r=>{const p=PRACTICE_UNITS.find(x=>x.id===r);return p?p.label:r;}).join(", ")}</span>`
+        : (!state.allSelected&&isEff&&pu.deps.length&&state.selectedPUs.has(pu.id)&&pu.deps.some(d=>effective.has(d)&&!state.selectedPUs.has(d)))
+          ? `<span class="pp-dep">auto-selects: ${pu.deps.filter(d=>effective.has(d)&&!state.selectedPUs.has(d)).map(d=>{const p=PRACTICE_UNITS.find(x=>x.id===d);return p?p.label:d;}).join(", ")}</span>`
+          : "";
+      h+=`<label class="pp-unit">
+        <input type="checkbox" data-puid="${esc(pu.id)}" ${isEff?"checked":""}
+          ${isAuto?"disabled title=\"Uncheck the requiring practice to remove this\"":""}>
+        <span class="pp-ulabel">${esc(pu.label)}${depLabel}</span>
+      </label>`;
+    });
+  });
+
+  h+=`<div class="pp-foot">
+    <button class="pp-footbtn" id="ppSelAll">Select all</button>
+    <button class="pp-footbtn" id="ppClear">Clear all</button>
+    <span class="pp-count">${effective.size}/${PRACTICE_UNITS.length} practices</span>
+  </div>`;
+
+  const panel=document.getElementById("pluginPicker");
+  panel.innerHTML=h;
+
+  panel.querySelectorAll("[data-preset]").forEach(btn=>{
+    btn.onclick=e=>{
+      e.stopPropagation();
+      const pid=btn.dataset.preset;
+      if(pid==="all"){
+        state.allSelected=true; state.selectedPUs=new Set(); state.cfg="";
+        document.getElementById("cfgSel").value="";
+      } else {
+        const cfg=configs[pid];
+        state.allSelected=false; state.selectedPUs=puIdsForConfig(cfg); state.cfg=pid;
+        document.getElementById("cfgSel").value=pid;
+      }
+      computePluginSet(); renderSidebar(); renderPluginPicker(); updatePluginBtn(); savePluginState();
+      if(state.graph)drawGraph();
+    };
+  });
+
+  panel.querySelectorAll("input[data-puid]").forEach(cb=>{
+    cb.onchange=e=>{
+      e.stopPropagation();
+      const id=cb.dataset.puid;
+      if(cb.checked) state.selectedPUs.add(id);
+      else {
+        // cascade: remove this id and any that depend ONLY on it (transitively)
+        state.selectedPUs.delete(id);
+        // remove selectedPUs whose effective set would still be covered — just let expandDeps handle it
+        // Also remove selectedPUs that depend on this (no longer satisfied)
+        const stillEff=expandDeps(state.selectedPUs);
+        // Remove from selectedPUs anything that is no longer in effective (shouldn't happen, but clean up)
+        [...state.selectedPUs].forEach(sid=>{if(!stillEff.has(sid))state.selectedPUs.delete(sid);});
+      }
+      if(state.selectedPUs.size===0) state.allSelected=true;
+      else state.allSelected=false;
+      state.cfg=""; document.getElementById("cfgSel").value="";
+      computePluginSet(); renderSidebar(); renderPluginPicker(); updatePluginBtn(); savePluginState();
+      if(state.graph)drawGraph();
+    };
+  });
+
+  document.getElementById("ppSelAll").onclick=e=>{
+    e.stopPropagation();
+    state.allSelected=true; state.selectedPUs=new Set(); state.cfg="";
+    document.getElementById("cfgSel").value="";
+    computePluginSet(); renderSidebar(); renderPluginPicker(); updatePluginBtn(); savePluginState();
+    if(state.graph)drawGraph();
+  };
+  document.getElementById("ppClear").onclick=e=>{
+    e.stopPropagation();
+    state.allSelected=false; state.selectedPUs=new Set(); state.cfg="";
+    document.getElementById("cfgSel").value="";
+    computePluginSet(); renderSidebar(); renderPluginPicker(); updatePluginBtn(); savePluginState();
+    if(state.graph)drawGraph();
+  };
 }
 
 // ---- sidebar -------------------------------------------------------------
@@ -261,7 +551,7 @@ function renderSidebar(){
   DATA.nodes.forEach(n=>{ if(visible(n)){(groups[n.type]=groups[n.type]||[]).push(n);} });
   const types=Object.keys(groups).sort((a,b)=>tmeta(a).g-tmeta(b).g || tmeta(a).l.localeCompare(tmeta(b).l));
   let html =
-   `<div class="facet"><h2>Configuration</h2><div id="cfgInfo"></div></div>`+
+   `<div class="facet"><h2>Active filter</h2><div id="cfgInfo"></div></div>`+
    `<div class="facet"><h2>Browse by type</h2><div id="typeList">`;
   if(!types.length) html+='<div class="empty">No elements match.</div>';
   types.forEach(t=>{
@@ -448,7 +738,12 @@ function renderReading(){
   // wire interactions
   R.querySelectorAll("[data-g]").forEach(el=>el.onclick=ev=>{ev.preventDefault();go(el.dataset.g);});
   R.querySelectorAll("[data-plugin]").forEach(el=>el.onclick=()=>{
-    state.plugin=el.dataset.plugin; document.getElementById("pluginSel").value=el.dataset.plugin; renderSidebar();});
+    const puId=dirToPU[el.dataset.plugin];
+    if(puId){
+      state.allSelected=false; state.selectedPUs=new Set([puId]);
+      computePluginSet(); renderSidebar(); renderPluginPicker(); updatePluginBtn(); savePluginState();
+    }
+  });
   R.querySelectorAll('a[href^="#"]').forEach(a=>a.onclick=ev=>{/* native hash nav ok */});
   document.getElementById("main").scrollTop=0;
 }
@@ -586,9 +881,9 @@ function graphNodes(){
       (outBy[state.sel]||[]).forEach(e=>keep.add(e.to_guid));
       (inBy[state.sel]||[]).forEach(e=>keep.add(e.from_guid));
       ns=DATA.nodes.filter(n=>keep.has(n.guid));
-      note=`Filtered set is large (${DATA.nodes.filter(visible).length}). Showing the neighbourhood of “${esc(nameOf(state.sel))}”. Narrow with a configuration/plugin, or click nodes to walk the graph.`;
+      note=`Filtered set is large (${DATA.nodes.filter(visible).length}). Showing the neighbourhood of “${esc(nameOf(state.sel))}”. Narrow with the Plugins picker, or click nodes to walk the graph.`;
     } else {
-      note=`Filtered set is large (${ns.length} nodes). Showing a sample of ${CAP} — pick a configuration/plugin or select an element to focus its neighbourhood.`;
+      note=`Filtered set is large (${ns.length} nodes). Showing a sample of ${CAP} — use the Plugins picker to narrow, or select an element to focus its neighbourhood.`;
       ns=ns.slice(0,CAP);
     }
   }
