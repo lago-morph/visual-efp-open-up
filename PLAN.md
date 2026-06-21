@@ -26,6 +26,41 @@ the files really contain, not assumptions.
 
 ---
 
+## 0b. Licensing & copyright preservation (added requirement)
+
+Licensing terms and copyright notices **must be preserved**. Investigation of
+the archive found a single, uniform content license:
+
+- **All imported EPF content is EPL-1.0.** `about.htm` states the content is
+  provided under the Eclipse Public License v1.0; the per-element
+  `copyright.xmi` repeats it; and **all 52 plugins reference the same
+  copyright statement** (`#_uuunoPsDEdmyhNQr5STrZQ`) — there is no second
+  content license.
+- **Copyright holders are multiple but the license is one**: IBM, Telelogic,
+  Armstrong Process Group, Number Six Software, Xansa, Scaled Agile, "and
+  others" (preserved verbatim in `NOTICE`).
+
+The repository is therefore **dual-licensed**, as the user confirmed:
+
+- **Viewer & tooling code → MIT** (`LICENSES/MIT.txt`, © Lagomorph Labs):
+  `index.html`, `tools/`, the JSON schema/code, docs.
+- **Imported EPF content → EPL-1.0** (`LICENSES/EPL-1.0.txt`): everything under
+  `source/` and all method text embedded in `data/method.json`.
+
+Implementation consequences:
+- Root `LICENSE` explains the split; `NOTICE` preserves the copyright notices +
+  provenance; both license texts live under `LICENSES/`.
+- **Every content node in `data/method.json` carries `"license": "EPL-1.0"`**
+  (plus the resolved `copyright_statement` GUID where present), and top-level
+  `meta` records the holders + a link to `LICENSES/EPL-1.0.txt`.
+- The viewer shows a per-element license line/badge linking to the in-repo
+  license copy, and a global footer crediting EPL-1.0 + the copyright holders.
+- The original copyright element ("EPF Copyright") remains a browseable node.
+- Should any element ever resolve to a *different* copyright statement, the
+  build tags that node with its own license rather than assuming EPL-1.0.
+
+---
+
 ## 1. Reconnaissance findings (why the model below is shaped this way)
 
 The single most important discovery: EPF splits every element into a
@@ -91,10 +126,20 @@ The brief's expected counts match the **content-file** count per directory:
 | templates | 20 | 20 |
 | guidelines | 84 | 93 |
 | concepts | 65 | 72 |
-| capability patterns | 56 | — (process pkgs) |
-| delivery processes | 10 | 2* |
+| capability patterns | 56 *(.xmi files)* | **25** *(real patterns)* |
+| delivery processes | 10 *(.xmi files)* | **4** *(real processes)* |
 | term definitions | 108 | 108 |
 | examples | 21 | 21 |
+
+> **Process-count correction:** the brief's ~56 capability patterns and 10
+> delivery processes are counts of `.xmi` files under those directories, but
+> each pattern/process is a *subdirectory* (`content.xmi` + `model.xmi` +
+> per-pattern `diagram.xmi`/`*.diagram`), so the **real** counts are **25
+> capability patterns** and **4 delivery processes**. Their actual
+> `CapabilityPattern`/`DeliveryProcess` elements live in the per-pattern
+> `model.xmi` (name/presentationName/guid), referenced from `plugin.xmi` by
+> href. Nodes for these come from the `model.xmi` element; deep activity/WBS
+> trees stay out of scope per §10. Reported precisely at build time.
 
 The faithful element count is **higher** wherever content-free contributors
 exist (tasks, roles, work products, guidelines, concepts); it matches exactly
