@@ -103,6 +103,7 @@
   .reltype{font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);margin:8px 0 2px}
   .rel{padding:3px 6px;border-radius:5px;cursor:pointer}
   .rel:hover{background:var(--chip)}
+  .rel.out-of-scope{opacity:.6}
   .rel .ty{font-size:11px;color:#fff;background:#9aa3b2;border-radius:4px;padding:0 5px;margin-right:6px}
   .vrel{background:var(--var-bg);border:1px solid #f0c7b4;border-radius:6px;padding:5px 8px;margin:4px 0;cursor:pointer}
   .vrel:hover{border-color:var(--var)}
@@ -369,10 +370,11 @@ function expandDeps(ids){
 function computePluginSet(){
   if(state.allSelected){state.pluginSet=null;return;}
   const effective=expandDeps(state.selectedPUs);
+  if(!effective.size){state.pluginSet=new Set();return;} // nothing selected → show nothing
   const dirs=new Set();
   PRACTICE_UNITS.forEach(pu=>{ if(effective.has(pu.id)) pu.plugins.forEach(d=>dirs.add(d)); });
   // core.* plugins are shared infrastructure (slots, roles, UMA concepts,
-  // categories) that practices reference — always include so cross-refs resolve.
+  // categories) that practices reference — include whenever any practice is active.
   DATA.plugins.forEach(p=>{ if(p.dir.startsWith("core.")) dirs.add(p.dir); });
   state.pluginSet=dirs;
 }
@@ -772,14 +774,22 @@ function linksPanelHTML(n,A){
   const inRefs=inAll.filter(e=>!e.variability);
   // group helper
   const grp=(arr,keyTo)=>{const g={};arr.forEach(e=>{(g[e.type]=g[e.type]||[]).push(keyTo?e.from_guid:e.to_guid);});return g;};
+  const inScope=gid=>{
+    if(!state.pluginSet) return true;
+    const nd=byGuid[gid]; return nd?state.pluginSet.has(nd.plugin):false;
+  };
   const renderRefs=(g,inbound=false)=>{
     const ks=Object.keys(g).sort(); if(!ks.length) return '<div class="empty">none</div>';
     const labelFn=inbound?prettyRelInbound:prettyRel;
     return ks.map(t=>`<div class="reltype">${esc(labelFn(t))}</div>`+
-      g[t].map(gid=>byGuid[gid]
-        ? `<div class="rel" data-g="${esc(gid)}"><span class="ty">${esc(shortType(byGuid[gid].type))}</span>${esc(nameOf(gid))}</div>`
-        : `<div class="rel" style="cursor:default"><span class="ty">?</span><span style="color:var(--dead)">unresolved (${esc(gid).slice(0,10)}…)</span></div>`
-      ).join("")).join("");
+      g[t].map(gid=>{
+        const nd=byGuid[gid];
+        if(!nd) return `<div class="rel" style="cursor:default"><span class="ty">?</span><span style="color:var(--dead)">unresolved (${esc(gid).slice(0,10)}…)</span></div>`;
+        const out=!inScope(gid);
+        return `<div class="rel${out?' out-of-scope':''}" ${out?'':''}data-g="${esc(gid)}" title="${out?'Outside current plugin selection — click to view anyway':''}">
+          <span class="ty" style="${out?'opacity:.5':''}background:${tmeta(nd.type).c};color:#fff">${esc(shortType(nd.type))}</span>${out?`<span style="color:var(--muted)">`:``}${esc(nameOf(gid))}${out?`</span><span style="font-size:10px;color:var(--muted);margin-left:4px">(${esc(nd.plugin)})</span>`:''}
+        </div>`;
+      }).join("")).join("");
   };
   // variability section (prominent)
   let vhtml="";
