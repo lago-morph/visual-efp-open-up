@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<!--
+  EPF Practices method browser — single-page viewer (MIT, © Lagomorph Labs).
+  Loads data/method.json (EPF Practices 1.5.1.5 content, EPL-1.0) and renders
+  an assembled, human-readable page per element from the faithfully decomposed
+  base + variability-fragment nodes. Vanilla JS + D3 (CDN). No build step.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>EPF Practices — Method Browser</title>
+<script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
+<style>
+  :root{
+    --bg:#f7f7f8; --panel:#fff; --ink:#1d2330; --muted:#6b7280; --line:#e3e6eb;
+    --accent:#2456b8; --accent2:#0f7b6c; --var:#d1481f; --var-bg:#fdeee7;
+    --dead:#b6b9c0; --chip:#eef1f6;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{font:14px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+       color:var(--ink);background:var(--bg);display:flex;flex-direction:column}
+  a{color:var(--accent);text-decoration:none}
+  a:hover{text-decoration:underline}
+  header{display:flex;gap:14px;align-items:center;padding:9px 16px;background:var(--panel);
+         border-bottom:1px solid var(--line);flex:0 0 auto;flex-wrap:wrap}
+  header h1{font-size:15px;margin:0;font-weight:700;letter-spacing:.2px;white-space:nowrap}
+  header h1 small{color:var(--muted);font-weight:400}
+  #search{flex:1 1 240px;min-width:160px;padding:6px 10px;border:1px solid var(--line);
+          border-radius:7px;font-size:13px}
+  header select{padding:6px 8px;border:1px solid var(--line);border-radius:7px;font-size:13px;background:#fff}
+  .btn{padding:6px 12px;border:1px solid var(--line);border-radius:7px;background:#fff;cursor:pointer;font-size:13px}
+  .btn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+  #wrap{flex:1 1 auto;display:flex;min-height:0}
+  #sidebar{width:330px;flex:0 0 auto;border-right:1px solid var(--line);background:var(--panel);
+           overflow:auto;padding:10px 0}
+  .facet{padding:6px 14px;border-bottom:1px solid var(--line)}
+  .facet h2{font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin:2px 0 7px}
+  .cfg label{display:flex;align-items:center;gap:7px;padding:2px 0;cursor:pointer;font-size:13px}
+  .cfg label .ct{margin-left:auto;color:var(--muted);font-size:12px}
+  .cfg label:hover{color:var(--accent)}
+  #pluginSel{width:100%}
+  #cfgInfo{font-size:12px;color:var(--muted);margin-top:6px}
+  #typeList{padding:4px 0}
+  .tgroup>.thead{display:flex;align-items:center;gap:6px;padding:5px 14px;cursor:pointer;font-weight:600;
+                 position:sticky;top:0;background:var(--panel)}
+  .tgroup>.thead:hover{background:var(--chip)}
+  .tgroup .dot{width:10px;height:10px;border-radius:3px;flex:0 0 auto}
+  .tgroup .ct{margin-left:auto;color:var(--muted);font-weight:400;font-size:12px}
+  .tgroup .items{display:none}
+  .tgroup.open .items{display:block}
+  .tgroup .item{padding:3px 14px 3px 32px;cursor:pointer;font-size:13px;white-space:nowrap;
+                overflow:hidden;text-overflow:ellipsis}
+  .tgroup .item:hover{background:var(--chip)}
+  .tgroup .item.sel{background:#e7eefb;color:var(--accent);font-weight:600}
+  .tgroup .item .frag{color:var(--var);font-size:11px;margin-left:4px}
+  #main{flex:1 1 auto;overflow:auto;position:relative}
+  #reading{padding:20px 28px;max-width:920px}
+  #graphView{display:none;position:absolute;inset:0}
+  /* reading pane */
+  .crumbs{font-size:12px;color:var(--muted);margin-bottom:6px}
+  .asm{background:#f0f4fb;border:1px solid #d8e2f5;border-radius:8px;padding:9px 12px;margin-bottom:14px;font-size:13px}
+  .asm b{color:var(--accent)}
+  .asm .chip{display:inline-block;background:#fff;border:1px solid #cdd9ef;border-radius:20px;
+             padding:2px 10px;margin:3px 4px 0 0;cursor:pointer;font-size:12px}
+  .asm .chip:hover{border-color:var(--accent)}
+  h2.title{font-size:23px;margin:2px 0 6px}
+  .badges{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:4px}
+  .badge{font-size:12px;padding:2px 9px;border-radius:20px;color:#fff;font-weight:600}
+  .badge.plugin{background:var(--chip);color:var(--ink);cursor:pointer;font-weight:500}
+  .lic{font-size:12px;color:var(--muted);margin:6px 0 14px}
+  .varbanner{background:var(--var-bg);border:1px solid #f0c7b4;border-left:4px solid var(--var);
+             border-radius:6px;padding:8px 12px;margin:10px 0;font-size:13px}
+  .varbanner b{color:var(--var)}
+  .body{margin:6px 0 8px}
+  .body img{max-width:100%;height:auto;border:1px solid var(--line);background:#fff;padding:3px;border-radius:4px}
+  .body table{border-collapse:collapse;margin:8px 0;max-width:100%}
+  .body td,.body th{border:1px solid var(--line);padding:5px 8px;vertical-align:top}
+  .body h3{font-size:15px;margin:16px 0 4px;padding-bottom:3px;border-bottom:1px solid var(--line)}
+  .body a.dead{color:var(--dead);cursor:not-allowed;text-decoration:line-through}
+  .body .field{margin:4px 0}
+  .secblock{border:1px solid var(--line);border-radius:8px;margin:10px 0;overflow:hidden}
+  .secblock>.sh{background:#fafbfc;padding:8px 12px;font-weight:600;border-bottom:1px solid var(--line);
+                display:flex;gap:8px;align-items:center}
+  .secblock>.sh .num{color:var(--muted);font-weight:700}
+  .secblock>.sb{padding:8px 12px}
+  .secblock.fromc>.sh{background:var(--var-bg)}
+  .fromtag{font-size:11px;color:var(--var);margin-left:auto;font-weight:600}
+  .addedblock{border:1px dashed var(--var);border-radius:8px;margin:12px 0;padding:0}
+  .addedblock>.ah{background:var(--var-bg);color:var(--var);padding:7px 12px;font-weight:600;font-size:13px}
+  .addedblock>.ab{padding:6px 12px}
+  .docstruct{border:1px solid var(--line);border-radius:8px;margin:12px 0;padding:0}
+  .docstruct>.dh{background:#fafbfc;padding:8px 12px;font-weight:600;border-bottom:1px solid var(--line)}
+  .docstruct ul{margin:8px 0;padding-left:26px}
+  .docstruct li{font-size:13px;color:#333}
+  .dl{display:inline-block;margin:6px 12px;padding:5px 11px;border:1px solid var(--line);border-radius:6px;font-size:13px}
+  .panels{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:18px}
+  @media(max-width:760px){.panels{grid-template-columns:1fr}}
+  .lp{border:1px solid var(--line);border-radius:8px;overflow:hidden}
+  .lp>.lph{background:#fafbfc;padding:8px 12px;font-weight:700;border-bottom:1px solid var(--line);font-size:13px}
+  .lp>.lpb{padding:6px 10px}
+  .reltype{font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);margin:8px 0 2px}
+  .rel{padding:3px 6px;border-radius:5px;cursor:pointer}
+  .rel:hover{background:var(--chip)}
+  .rel .ty{font-size:11px;color:#fff;background:#9aa3b2;border-radius:4px;padding:0 5px;margin-right:6px}
+  .vrel{background:var(--var-bg);border:1px solid #f0c7b4;border-radius:6px;padding:5px 8px;margin:4px 0;cursor:pointer}
+  .vrel:hover{border-color:var(--var)}
+  .vrel .arrow{color:var(--var);font-weight:700;margin-right:5px}
+  .vrel .vt{font-weight:700;color:var(--var)}
+  .empty{color:var(--muted);font-size:13px;padding:6px}
+  /* graph */
+  #graphView svg{width:100%;height:100%;cursor:grab}
+  .glegend{position:absolute;top:10px;right:12px;background:rgba(255,255,255,.95);border:1px solid var(--line);
+           border-radius:8px;padding:8px 10px;font-size:12px;max-height:80%;overflow:auto;max-width:220px}
+  .glegend .lrow{display:flex;align-items:center;gap:7px;margin:2px 0}
+  .glegend .sw{width:11px;height:11px;border-radius:3px}
+  .gnote{position:absolute;top:10px;left:12px;background:rgba(255,255,255,.95);border:1px solid var(--line);
+         border-radius:8px;padding:6px 10px;font-size:12px;color:var(--muted);max-width:60%}
+  .gnode{cursor:pointer;stroke:#fff;stroke-width:1.2px}
+  .gnode.sel{stroke:#111;stroke-width:2.5px}
+  .glabel{font-size:9px;fill:#333;pointer-events:none}
+  footer{flex:0 0 auto;border-top:1px solid var(--line);background:var(--panel);padding:8px 16px;
+         font-size:12px;color:var(--muted);display:flex;gap:16px;flex-wrap:wrap}
+  .spin{padding:40px;text-align:center;color:var(--muted)}
+</style>
+</head>
+<body>
+<header>
+  <h1>EPF Practices <small>· Method Browser</small></h1>
+  <input id="search" type="search" placeholder="Filter elements by name…" autocomplete="off"/>
+  <label style="font-size:12px;color:var(--muted)">Config
+    <select id="cfgSel"></select></label>
+  <select id="pluginSel"></select>
+  <button id="graphBtn" class="btn">Graph view</button>
+</header>
+<div id="wrap">
+  <aside id="sidebar"><div class="spin">Loading…</div></aside>
+  <div id="main">
+    <div id="reading"><div class="spin">Loading method.json…</div></div>
+    <div id="graphView"></div>
+  </div>
+</div>
+<footer>
+  <span><b>Viewer:</b> MIT © Lagomorph Labs (<a href="LICENSES/MIT.txt">LICENSE</a>)</span>
+  <span><b>Content:</b> EPF Practices 1.5.1.5 (2012-12-12) —
+        <a href="LICENSES/EPL-1.0.txt">EPL-1.0</a>, © IBM, Telelogic, Armstrong Process Group,
+        Number Six Software, Xansa, Scaled Agile &amp; others (<a href="NOTICE">NOTICE</a>)</span>
+  <span id="provctr"></span>
+</footer>
+
+<script>
+"use strict";
+const SRC_PREFIX = "source/epf_prac_1515";
+
+// ---- type display: label, colour, group order ---------------------------
+const TYPE_META = {
+  Task:{l:"Tasks",c:"#2456b8",g:1}, Role:{l:"Roles",c:"#7b3fa0",g:2},
+  Artifact:{l:"Work Products · Artifacts",c:"#0f7b6c",g:3},
+  Deliverable:{l:"Work Products · Deliverables",c:"#0f9e88",g:3},
+  Outcome:{l:"Work Products · Outcomes",c:"#13b89f",g:3},
+  Guideline:{l:"Guidelines",c:"#b8860b",g:4}, Concept:{l:"Concepts",c:"#c2682a",g:5},
+  Checklist:{l:"Checklists",c:"#3a7d2c",g:6}, Template:{l:"Templates",c:"#9a6a00",g:7},
+  Example:{l:"Examples",c:"#8a7f1e",g:8}, Roadmap:{l:"Roadmaps",c:"#a0522d",g:9},
+  SupportingMaterial:{l:"Supporting Materials",c:"#5f6b7a",g:10},
+  TermDefinition:{l:"Term Definitions",c:"#8895a7",g:11},
+  ToolMentor:{l:"Tool Mentors",c:"#557",g:12}, Tool:{l:"Tools",c:"#456",g:12},
+  Report:{l:"Reports",c:"#789",g:12}, Practice:{l:"Practices",c:"#d1481f",g:0},
+  CapabilityPattern:{l:"Capability Patterns",c:"#b5179e",g:13},
+  DeliveryProcess:{l:"Delivery Processes",c:"#7209b7",g:14},
+  Discipline:{l:"Disciplines",c:"#577590",g:15}, Domain:{l:"Domains",c:"#43699c",g:15},
+  RoleSet:{l:"Role Sets",c:"#6a4c93",g:15}, CustomCategory:{l:"Custom Categories",c:"#9aa3b2",g:16},
+  DisciplineGrouping:{l:"Discipline Groupings",c:"#577590",g:15}
+};
+const tmeta = t => TYPE_META[t] || {l:t,c:"#888",g:99};
+
+// ---- state ---------------------------------------------------------------
+let DATA, byGuid={}, outBy={}, inBy={}, configs={}, plugins={};
+const state = {cfg:"", plugin:"", q:"", graph:false, sel:null, openTypes:new Set()};
+
+// ---- load ----------------------------------------------------------------
+fetch("data/method.json").then(r=>r.json()).then(d=>{
+  DATA=d;
+  d.nodes.forEach(n=>byGuid[n.guid]=n);
+  d.edges.forEach(e=>{
+    (outBy[e.from_guid]=outBy[e.from_guid]||[]).push(e);
+    (inBy[e.to_guid]=inBy[e.to_guid]||[]).push(e);
+  });
+  d.plugins.forEach(p=>plugins[p.dir]=p);
+  d.configs=d.configurations; d.configurations.forEach(c=>configs[c.guid]=c);
+  initControls();
+  window.addEventListener("hashchange",onHash);
+  onHash();
+  renderSidebar();
+}).catch(e=>{
+  document.getElementById("reading").innerHTML =
+    '<p class="empty">Failed to load <code>data/method.json</code>: '+esc(String(e))+'</p>';
+});
+
+// ---- helpers -------------------------------------------------------------
+function esc(s){return (s||"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]));}
+function nameOf(g){const n=byGuid[g];return n?(n.presentation_name||n.name||g):null;}
+function curGuid(){return decodeURIComponent((location.hash||"").replace(/^#/,""));}
+
+function configPlugins(){ // set of plugin dirs for active config, or null=all
+  if(!state.cfg) return null;
+  const c = configs[state.cfg]; return c? new Set(c.plugins) : null;
+}
+function visible(n){
+  const cp = configPlugins();
+  if(cp && !cp.has(n.plugin)) return false;
+  if(state.plugin && n.plugin!==state.plugin) return false;
+  if(state.q){
+    const q=state.q.toLowerCase();
+    if(!((n.presentation_name||"").toLowerCase().includes(q) ||
+         (n.name||"").toLowerCase().includes(q))) return false;
+  }
+  return true;
+}
+
+// ---- controls ------------------------------------------------------------
+function initControls(){
+  const cs=document.getElementById("cfgSel");
+  cs.innerHTML='<option value="">All content</option>'+
+    DATA.configurations.map(c=>`<option value="${c.guid}">${esc(c.presentation_name)}</option>`).join("");
+  cs.onchange=()=>{state.cfg=cs.value;renderSidebar();updateCfgInfo();if(state.graph)drawGraph();};
+
+  const ps=document.getElementById("pluginSel");
+  const fam={};
+  DATA.plugins.forEach(p=>{const k=p.dir.split(".")[0];(fam[k]=fam[k]||[]).push(p);});
+  let html='<option value="">All plugins ('+DATA.plugins.length+')</option>';
+  Object.keys(fam).sort().forEach(k=>{
+    html+=`<optgroup label="${k}.*">`+
+      fam[k].sort((a,b)=>a.presentation_name.localeCompare(b.presentation_name))
+        .map(p=>`<option value="${esc(p.dir)}">${esc(p.presentation_name)} — ${esc(p.dir)}</option>`).join("")+
+      `</optgroup>`;
+  });
+  ps.innerHTML=html;
+  ps.onchange=()=>{state.plugin=ps.value;renderSidebar();if(state.graph)drawGraph();};
+
+  document.getElementById("search").oninput=e=>{state.q=e.target.value.trim();renderSidebar();};
+  document.getElementById("graphBtn").onclick=toggleGraph;
+
+  // footer provenance counts
+  const c=DATA.meta.counts;
+  document.getElementById("provctr").innerHTML =
+    `${c.nodes} elements · ${c.edges} links · ${c.variability_edges} variability · ${c.plugins} plugins`;
+}
+function updateCfgInfo(){
+  const el=document.getElementById("cfgInfo"); if(!el) return;
+  if(!state.cfg){el.textContent="Showing the whole library."; return;}
+  const c=configs[state.cfg];
+  const n=DATA.nodes.filter(x=>c.plugins.includes(x.plugin)).length;
+  el.innerHTML=`<b>${esc(c.presentation_name)}</b>: ${c.plugins.length} plugins, ${n} elements.`;
+}
+
+// ---- sidebar -------------------------------------------------------------
+function renderSidebar(){
+  const sb=document.getElementById("sidebar");
+  const groups={};
+  DATA.nodes.forEach(n=>{ if(visible(n)){(groups[n.type]=groups[n.type]||[]).push(n);} });
+  const types=Object.keys(groups).sort((a,b)=>tmeta(a).g-tmeta(b).g || tmeta(a).l.localeCompare(tmeta(b).l));
+  let html =
+   `<div class="facet"><h2>Configuration</h2><div id="cfgInfo"></div></div>`+
+   `<div class="facet"><h2>Browse by type</h2><div id="typeList">`;
+  if(!types.length) html+='<div class="empty">No elements match.</div>';
+  types.forEach(t=>{
+    const m=tmeta(t), arr=groups[t].sort(byName), open=state.openTypes.has(t)||state.q;
+    html+=`<div class="tgroup ${open?'open':''}" data-t="${esc(t)}">
+      <div class="thead"><span class="dot" style="background:${m.c}"></span>${esc(m.l)}
+        <span class="ct">${arr.length}</span></div><div class="items">`+
+      arr.map(n=>`<div class="item ${n.guid===state.sel?'sel':''}" data-g="${esc(n.guid)}">
+        ${esc(n.presentation_name||n.name)}${n.variability_type?`<span class="frag">«${esc(n.variability_type)}»</span>`:""}
+        ${!n.has_content?'<span class="frag" title="content-free fragment">∅</span>':""}</div>`).join("")+
+      `</div></div>`;
+  });
+  html+=`</div></div>`;
+  sb.innerHTML=html;
+  updateCfgInfo();
+  sb.querySelectorAll(".thead").forEach(h=>h.onclick=()=>{
+    const t=h.parentElement.dataset.t;
+    state.openTypes.has(t)?state.openTypes.delete(t):state.openTypes.add(t);
+    h.parentElement.classList.toggle("open");
+  });
+  sb.querySelectorAll(".item").forEach(it=>it.onclick=()=>{location.hash=encodeURIComponent(it.dataset.g);});
+}
+function byName(a,b){return (a.presentation_name||a.name).localeCompare(b.presentation_name||b.name);}
+
+// ---- sanitize + rewrite body HTML ---------------------------------------
+const OK_TAGS=new Set(["a","p","br","ul","ol","li","b","i","em","strong","u","s","sup","sub",
+  "h1","h2","h3","h4","h5","h6","table","thead","tbody","tfoot","tr","td","th","caption","col","colgroup",
+  "img","span","div","pre","code","blockquote","hr","dl","dt","dd","section","figure","figcaption","center"]);
+const OK_ATTR=new Set(["href","src","alt","title","class","colspan","rowspan","width","height","align","valign","guid","target","scope"]);
+
+function sanitize(rawHtml, sourcePath){
+  const tpl=document.createElement("template");
+  tpl.innerHTML=rawHtml||"";
+  const baseDir = sourcePath? sourcePath.slice(0,sourcePath.lastIndexOf("/")) : SRC_PREFIX;
+  const walk=el=>{
+    [...el.children].forEach(ch=>{
+      const tag=ch.tagName.toLowerCase();
+      if(!OK_TAGS.has(tag)){ // unwrap unknown tag, keep children/text
+        const f=document.createDocumentFragment();
+        while(ch.firstChild) f.appendChild(ch.firstChild);
+        ch.replaceWith(f); walk(el); return;
+      }
+      [...ch.attributes].forEach(a=>{
+        const an=a.name.toLowerCase();
+        if(!OK_ATTR.has(an) || an.startsWith("on") || /javascript:/i.test(a.value)) ch.removeAttribute(a.name);
+      });
+      if(tag==="a"){
+        const g=ch.getAttribute("guid");
+        if(g){ ch.removeAttribute("guid");
+          if(byGuid[g]){ ch.setAttribute("href","#"+encodeURIComponent(g)); ch.classList.remove("dead"); }
+          else { ch.removeAttribute("href"); ch.classList.add("dead"); ch.title="target not in library"; }
+        } else {
+          const h=ch.getAttribute("href")||"";
+          if(/^https?:/i.test(h)) ch.setAttribute("target","_blank");
+          else if(h && !h.startsWith("#")){ ch.classList.add("dead"); ch.removeAttribute("href"); }
+        }
+      }
+      if(tag==="img"){
+        const s=ch.getAttribute("src")||"";
+        if(s && !/^https?:|^data:/i.test(s)) ch.setAttribute("src", resolveRel(s, baseDir));
+        ch.setAttribute("loading","lazy");
+      }
+      walk(ch);
+    });
+  };
+  walk(tpl.content);
+  return tpl.content;
+}
+function resolveRel(rel, baseDir){
+  try{ const u=new URL(rel, "http://x/"+baseDir+"/"); return u.pathname.replace(/^\//,""); }
+  catch(e){ return baseDir+"/"+rel; }
+}
+
+// ---- assemble (render-time variability merge) ----------------------------
+function assemble(node){
+  const inV=(inBy[node.guid]||[]).filter(e=>e.variability);
+  const contributors=inV.filter(e=>e.type==="contributes"||e.type==="extends")
+                        .map(e=>byGuid[e.from_guid]).filter(Boolean);
+  const replacers=inV.filter(e=>e.type==="replaces").map(e=>byGuid[e.from_guid]).filter(Boolean);
+  // steps: base then contributors'
+  const sections=node.sections.map(s=>({...s,from:null}));
+  contributors.forEach(c=>c.sections.forEach(s=>sections.push({...s,from:c})));
+  // body blocks
+  const bodyBlocks=[{html:node.body_html,from:null}];
+  contributors.forEach(c=>{ if(c.body_html&&c.body_html.trim()) bodyBlocks.push({html:c.body_html,from:c}); });
+  // outbound refs union (non-variability)
+  const refs=new Map();
+  const addRefs=(g,owner)=> (outBy[g]||[]).filter(e=>!e.variability).forEach(e=>{
+    refs.set(e.type+"|"+e.to_guid,{type:e.type,to:e.to_guid,owner});
+  });
+  addRefs(node.guid,null); contributors.forEach(c=>addRefs(c.guid,c));
+  return {contributors,replacers,sections,bodyBlocks,outRefs:[...refs.values()]};
+}
+
+// ---- reading pane --------------------------------------------------------
+function onHash(){ const g=curGuid(); state.sel=g||null; renderReading(); markSidebar(); if(state.graph)highlightGraph();}
+function markSidebar(){
+  document.querySelectorAll("#sidebar .item").forEach(it=>
+    it.classList.toggle("sel", it.dataset.g===state.sel));
+}
+function go(g){ location.hash="#"+encodeURIComponent(g); }
+
+function renderReading(){
+  const R=document.getElementById("reading");
+  if(!state.sel){ R.innerHTML=overviewHTML(); R.querySelectorAll("[data-g]").forEach(a=>a.onclick=ev=>{ev.preventDefault();go(a.dataset.g);}); return; }
+  const n=byGuid[state.sel];
+  if(!n){ R.innerHTML='<p class="empty">Unknown element <code>'+esc(state.sel)+'</code>.</p>'; return; }
+  const A=assemble(n), m=tmeta(n.type);
+  let h="";
+
+  // assembled-from provenance strip
+  if(A.contributors.length){
+    h+=`<div class="asm">Assembled page — content merged from
+      <b>${esc(plugins[n.plugin]?plugins[n.plugin].presentation_name:n.plugin)}</b> (base)`;
+    A.contributors.forEach(c=>h+=`<span class="chip" data-g="${esc(c.guid)}">+ ${esc(plugins[c.plugin]?plugins[c.plugin].presentation_name:c.plugin)} ↗</span>`);
+    h+=`<div style="margin-top:4px;color:var(--muted)">Each fragment is a separate node in the data — click to view it in isolation.</div></div>`;
+  }
+
+  // title + badges
+  h+=`<div class="crumbs">${esc(n.name||"")}</div>`;
+  h+=`<h2 class="title">${esc(n.presentation_name||n.name||n.guid)}</h2>`;
+  h+=`<div class="badges"><span class="badge" style="background:${m.c}">${esc(n.type)}</span>`+
+     `<span class="badge plugin" data-plugin="${esc(n.plugin)}" title="filter by this plugin">▣ ${esc(plugins[n.plugin]?plugins[n.plugin].presentation_name:n.plugin)}</span>`+
+     (n.variability_type?`<span class="badge" style="background:var(--var)">«${esc(n.variability_type)}» variant</span>`:"")+
+     (!n.has_content?`<span class="badge" style="background:#9aa3b2">content-free fragment</span>`:"")+
+     `</div>`;
+  h+=`<div class="lic">License of this content: <b>EPL-1.0</b> ·
+      <a href="LICENSES/EPL-1.0.txt">license text</a> ·
+      <a href="${esc(n.source_path)}">source XMI ↗</a></div>`;
+
+  // own variability banner
+  (outBy[n.guid]||[]).filter(e=>e.variability).forEach(e=>{
+    const tgt=byGuid[e.to_guid];
+    h+=`<div class="varbanner"><b>↳ ${esc(e.type)}</b> ${tgt?`«<a href="#${encodeURIComponent(e.to_guid)}">${esc(nameOf(e.to_guid))}</a>»`:`«unresolved base»`} — this element ${esc(e.type)} the base element above.</div>`;
+  });
+  if(A.replacers.length){
+    h+=`<div class="varbanner"><b>Replaced</b> by `+
+       A.replacers.map(r=>`«<a href="#${encodeURIComponent(r.guid)}">${esc(r.presentation_name)}</a>» (${esc(r.plugin)})`).join(", ")+
+       ` — the replacing content is the effective version; the original below is demoted.</div>`;
+  }
+
+  // body (assembled)
+  h+=`<div class="body" id="bodyMount"></div>`;
+  // sections (assembled steps)
+  if(A.sections.length){
+    h+=`<div id="secMount"></div>`;
+  }
+  // document structure (templates/examples)
+  if(n.attachments&&n.attachments.length) h+=`<div id="docMount"></div>`;
+
+  // links panel
+  h+=`<div class="panels">`+linksPanelHTML(n,A)+`</div>`;
+
+  R.innerHTML=h;
+
+  // mount sanitized body
+  const bm=R.querySelector("#bodyMount");
+  A.bodyBlocks.forEach(b=>{
+    if(b.from){
+      const wrap=document.createElement("div"); wrap.className="addedblock";
+      wrap.innerHTML=`<div class="ah">Additional content from «${esc(plugins[b.from.plugin]?plugins[b.from.plugin].presentation_name:b.from.plugin)}»</div><div class="ab"></div>`;
+      wrap.querySelector(".ab").appendChild(sanitize(b.html,b.from.source_path));
+      bm.appendChild(wrap);
+    } else if(b.html&&b.html.trim()){
+      bm.appendChild(sanitize(b.html,n.source_path));
+    } else {
+      bm.innerHTML='<p class="empty">No description body for this element'+(n.has_content?'.':' (content-free variability fragment — see relationships).')+'</p>';
+    }
+  });
+  // mount sections
+  const sm=R.querySelector("#secMount");
+  if(sm){
+    A.sections.forEach((s,i)=>{
+      const d=document.createElement("div"); d.className="secblock"+(s.from?" fromc":"");
+      d.innerHTML=`<div class="sh"><span class="num">${i+1}.</span>${esc(s.name||"Step")}${s.from?`<span class="fromtag">from ${esc(plugins[s.from.plugin]?plugins[s.from.plugin].presentation_name:s.from.plugin)}</span>`:""}</div><div class="sb"></div>`;
+      d.querySelector(".sb").appendChild(sanitize(s.description_html,(s.from||n).source_path));
+      sm.appendChild(d);
+    });
+  }
+  // mount document structure
+  const dm=R.querySelector("#docMount");
+  if(dm) dm.appendChild(docStructEl(n));
+
+  // wire interactions
+  R.querySelectorAll("[data-g]").forEach(el=>el.onclick=ev=>{ev.preventDefault();go(el.dataset.g);});
+  R.querySelectorAll("[data-plugin]").forEach(el=>el.onclick=()=>{
+    state.plugin=el.dataset.plugin; document.getElementById("pluginSel").value=el.dataset.plugin; renderSidebar();});
+  R.querySelectorAll('a[href^="#"]').forEach(a=>a.onclick=ev=>{/* native hash nav ok */});
+  document.getElementById("main").scrollTop=0;
+}
+
+function docStructEl(n){
+  const wrap=document.createElement("div");
+  let h="";
+  n.attachments.forEach(a=>{
+    h+=`<div class="docstruct"><div class="dh">Document structure — ${esc(a.filename)}</div>`;
+    if(a.extracted&&a.extracted.length){
+      h+=`<ul>`+a.extracted.map(x=>`<li>${esc(x)}</li>`).join("")+`</ul>`;
+    } else {
+      h+=`<div class="empty" style="padding:8px 12px">No readable structure could be extracted from this `+
+         `${esc(a.ext.toUpperCase())} file (old binary format). Use the download link below.</div>`;
+    }
+    h+=`<a class="dl" href="${esc(a.path)}" download>⬇ Download ${esc(a.filename)} (${esc(a.ext)})</a></div>`;
+  });
+  wrap.innerHTML=h; return wrap;
+}
+
+function linksPanelHTML(n,A){
+  // outbound
+  const outV=(outBy[n.guid]||[]).filter(e=>e.variability);
+  const inAll=(inBy[n.guid]||[]);
+  const inV=inAll.filter(e=>e.variability);
+  const inRefs=inAll.filter(e=>!e.variability);
+  // group helper
+  const grp=(arr,keyTo)=>{const g={};arr.forEach(e=>{(g[e.type]=g[e.type]||[]).push(keyTo?e.from_guid:e.to_guid);});return g;};
+  const renderRefs=g=>{
+    const ks=Object.keys(g).sort(); if(!ks.length) return '<div class="empty">none</div>';
+    return ks.map(t=>`<div class="reltype">${esc(prettyRel(t))}</div>`+
+      g[t].map(gid=>byGuid[gid]
+        ? `<div class="rel" data-g="${esc(gid)}"><span class="ty">${esc(shortType(byGuid[gid].type))}</span>${esc(nameOf(gid))}</div>`
+        : `<div class="rel" style="cursor:default"><span class="ty">?</span><span style="color:var(--dead)">unresolved (${esc(gid).slice(0,10)}…)</span></div>`
+      ).join("")).join("");
+  };
+  // variability section (prominent)
+  let vhtml="";
+  outV.forEach(e=>vhtml+=vrel("↳",e.type,"to",e.to_guid));
+  inV.forEach(e=>vhtml+=vrel("↰",e.type,"from",e.from_guid));
+  if(!vhtml) vhtml='<div class="empty">No variability relationships.</div>';
+
+  // outbound union (assembled) minus variability
+  const outG={}; A.outRefs.forEach(r=>{(outG[r.type]=outG[r.type]||[]).push(r.to);});
+
+  return `<div class="lp"><div class="lph">⚡ Variability</div><div class="lpb">${vhtml}</div></div>`+
+         `<div class="lp"><div class="lph">→ Outbound references${A.contributors.length?' (assembled)':''}</div><div class="lpb">${renderRefs(outG)}</div></div>`+
+         `<div class="lp"><div class="lph">← Inbound references</div><div class="lpb">${renderRefs(grp(inRefs,true))}</div></div>`;
+}
+function vrel(arrow,type,dir,gid){
+  const known=byGuid[gid];
+  const label= dir==="to" ? `${type} ` : `${invRel(type)} `;
+  return `<div class="vrel" ${known?`data-g="${esc(gid)}"`:''}>
+    <span class="arrow">${arrow}</span><span class="vt">${esc(label)}</span>
+    «${known?esc(nameOf(gid)):"unresolved"}»${known?` <span style="color:var(--muted)">(${esc(known.plugin)})</span>`:""}</div>`;
+}
+function invRel(t){return {contributes:"contributed to by",extends:"extended by",replaces:"replaced by"}[t]||(t+" by");}
+function prettyRel(t){return t.replace(/_/g," ").replace(/([a-z])([A-Z])/g,"$1 $2").toLowerCase();}
+function shortType(t){return (tmeta(t).l||t).split(" ")[0];}
+
+function overviewHTML(){
+  const c=DATA.meta.counts, p=DATA.meta.provenance;
+  const top=Object.entries(c.by_type_published||{}).sort((a,b)=>b[1]-a[1]);
+  return `<h2 class="title">EPF Practices — Method Browser</h2>
+   <p>A single-page browser for the complete <b>Eclipse Process Framework (EPF) Practices</b>
+   method library (${p.library}, ${p.date}). It renders each task, work product, role, guidance,
+   capability pattern and delivery process as one <b>assembled</b> page — applying UMA
+   variability (<i>contributes / extends / replaces</i>) at read time — while the underlying
+   <code>data/method.json</code> keeps every base and every variability fragment as a separate node.</p>
+   <p><b>${c.nodes}</b> elements · <b>${c.edges}</b> cross-references ·
+      <b>${c.variability_edges}</b> variability relationships · <b>${c.plugins}</b> plugins ·
+      <b>${c.configurations}</b> configurations.</p>
+   <div class="asm">Pick an element on the left, choose a <b>configuration</b> (e.g. OpenUP) or a
+     <b>plugin</b> to scope the library, type to filter, or open the <b>Graph view</b>.
+     Every link below is shareable via <code>#guid</code>.</div>
+   <div class="panels">
+     <div class="lp"><div class="lph">Published elements by type</div><div class="lpb">${
+       top.map(([t,k])=>`<div class="rel" onclick="document.querySelector('.tgroup[data-t=&quot;${esc(t)}&quot;] .thead')?.click()">
+         <span class="ty" style="background:${tmeta(t).c}">${k}</span>${esc(tmeta(t).l)}</div>`).join("")}</div></div>
+     <div class="lp"><div class="lph">Licensing</div><div class="lpb" style="font-size:13px">
+       <p><b>Viewer code:</b> MIT © Lagomorph Labs.</p>
+       <p><b>Imported content:</b> EPL-1.0. Every content node is tagged
+          <code>license: "EPL-1.0"</code>. © IBM, Telelogic, Armstrong Process Group,
+          Number Six Software, Xansa, Scaled Agile and others.</p>
+       <p><a href="LICENSES/EPL-1.0.txt">EPL-1.0</a> · <a href="LICENSES/MIT.txt">MIT</a> · <a href="NOTICE">NOTICE</a></p>
+     </div></div>
+   </div>`;
+}
+
+// ---- graph view ----------------------------------------------------------
+function toggleGraph(){ state.graph=!state.graph; applyView(); if(state.graph)drawGraph(); }
+function applyView(){
+  document.getElementById("graphView").style.display=state.graph?"block":"none";
+  document.getElementById("reading").style.display=state.graph?"none":"block";
+  document.getElementById("graphBtn").classList.toggle("active",state.graph);
+  document.getElementById("graphBtn").textContent=state.graph?"Reading view":"Graph view";
+}
+let gsim;
+function graphNodes(){
+  let ns=DATA.nodes.filter(visible);
+  let note="";
+  const CAP=700;
+  if(ns.length>CAP){
+    // too dense → show neighbourhood of selection, else a capped sample
+    if(state.sel && byGuid[state.sel]){
+      const keep=new Set([state.sel]);
+      (outBy[state.sel]||[]).forEach(e=>keep.add(e.to_guid));
+      (inBy[state.sel]||[]).forEach(e=>keep.add(e.from_guid));
+      ns=DATA.nodes.filter(n=>keep.has(n.guid));
+      note=`Filtered set is large (${DATA.nodes.filter(visible).length}). Showing the neighbourhood of “${esc(nameOf(state.sel))}”. Narrow with a configuration/plugin, or click nodes to walk the graph.`;
+    } else {
+      note=`Filtered set is large (${ns.length} nodes). Showing a sample of ${CAP} — pick a configuration/plugin or select an element to focus its neighbourhood.`;
+      ns=ns.slice(0,CAP);
+    }
+  }
+  return {ns,note};
+}
+function drawGraph(){
+  const host=d3.select("#graphView"); host.selectAll("*").remove();
+  const {ns,note}=graphNodes();
+  const ids=new Set(ns.map(n=>n.guid));
+  const links=DATA.edges.filter(e=>ids.has(e.from_guid)&&ids.has(e.to_guid))
+    .map(e=>({source:e.from_guid,target:e.to_guid,variability:e.variability,type:e.type}));
+  const W=host.node().clientWidth||800, H=host.node().clientHeight||600;
+  const svg=host.append("svg").attr("viewBox",[0,0,W,H]);
+  const root=svg.append("g");
+  svg.call(d3.zoom().scaleExtent([0.15,4]).on("zoom",ev=>root.attr("transform",ev.transform)));
+  const nodes=ns.map(n=>({id:n.guid,t:n.type,name:n.presentation_name||n.name}));
+  gsim=d3.forceSimulation(nodes)
+    .force("link",d3.forceLink(links).id(d=>d.id).distance(60).strength(.3))
+    .force("charge",d3.forceManyBody().strength(-120))
+    .force("center",d3.forceCenter(W/2,H/2))
+    .force("collide",d3.forceCollide(12));
+  const link=root.append("g").selectAll("line").data(links).join("line")
+    .attr("stroke",d=>d.variability?"var(--var)":"#cdd2da")
+    .attr("stroke-width",d=>d.variability?2:1)
+    .attr("stroke-dasharray",d=>d.variability?"4 3":null)
+    .attr("opacity",d=>d.variability?.95:.5);
+  const node=root.append("g").selectAll("circle").data(nodes).join("circle")
+    .attr("class","gnode").attr("r",d=>d.id===state.sel?9:6)
+    .attr("fill",d=>tmeta(d.t).c)
+    .classed("sel",d=>d.id===state.sel)
+    .on("click",(e,d)=>go(d.id))
+    .call(d3.drag()
+      .on("start",(e,d)=>{if(!e.active)gsim.alphaTarget(.3).restart();d.fx=d.x;d.fy=d.y;})
+      .on("drag",(e,d)=>{d.fx=e.x;d.fy=e.y;})
+      .on("end",(e,d)=>{if(!e.active)gsim.alphaTarget(0);d.fx=null;d.fy=null;}));
+  node.append("title").text(d=>d.name+" — "+d.t);
+  const label=root.append("g").selectAll("text").data(nodes.length<=120?nodes:[]).join("text")
+    .attr("class","glabel").attr("dx",8).attr("dy",3).text(d=>d.name);
+  gsim.on("tick",()=>{
+    link.attr("x1",d=>d.source.x).attr("y1",d=>d.source.y).attr("x2",d=>d.target.x).attr("y2",d=>d.target.y);
+    node.attr("cx",d=>d.x).attr("cy",d=>d.y);
+    label.attr("x",d=>d.x).attr("y",d=>d.y);
+  });
+  // legend + note
+  const types=[...new Set(nodes.map(n=>n.t))].sort((a,b)=>tmeta(a).g-tmeta(b).g);
+  let leg=`<div class="lrow"><span style="font-weight:700">${nodes.length} nodes · ${links.length} links</span></div>
+    <div class="lrow"><span class="sw" style="background:var(--var);border-radius:0;height:3px"></span>variability edge</div>
+    <div class="lrow"><span class="sw" style="background:#cdd2da;border-radius:0;height:2px"></span>reference edge</div><hr/>`;
+  leg+=types.map(t=>`<div class="lrow"><span class="sw" style="background:${tmeta(t).c}"></span>${esc(tmeta(t).l)}</div>`).join("");
+  host.append("xhtml:div").attr("class","glegend").html(leg);
+  if(note) host.append("xhtml:div").attr("class","gnote").html(note);
+}
+function highlightGraph(){ if(state.graph) drawGraph(); }
+applyView();
+</script>
+</body>
+</html>
